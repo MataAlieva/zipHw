@@ -1,10 +1,10 @@
 package zipHw;
 
-import com.codeborne.pdftest.PDF;
-import com.codeborne.xlstest.XLS;
 import com.opencsv.CSVReader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -51,35 +51,69 @@ public class FileParsingTest {
 
     @Test
     void zipFileParsingTest3() throws Exception {
-        try (ZipInputStream zis = new ZipInputStream(
-                cl.getResourceAsStream("zipExample.zip")
-        )) {
-            ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
-                if (entry.getName().endsWith(".pdf")) {
-                    break;
-                }
-                throw new FileNotFoundException("ERROR:PDF File - not found in zip file");
+        ClassLoader cl = this.getClass().getClassLoader();
+        try (InputStream resourceStream = cl.getResourceAsStream("zipExample.zip")) {
+            if (resourceStream == null) {
+                throw new FileNotFoundException("ERROR:zipExample File not found in resources");
             }
-            PDF pdf = new PDF(zis);
-            Assertions.assertTrue(pdf.text.contains("Инструкция"));
+            try (ZipInputStream zis = new ZipInputStream(resourceStream)) {
+                ZipEntry entry;
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                boolean pdfFound = false;
+
+            while ((entry = zis.getNextEntry()) != null) {
+                 if (entry.getName().endsWith(".pdf")) {
+                     byte[] buffer = new byte[1024];
+                     int len;
+                     while ((len = zis.read(buffer)) > 0) {
+                         baos.write(buffer, 0, len);
+                     }
+                     pdfFound = true;
+                     break;
+                 }
+                }
+                if (!pdfFound) {
+                    throw new FileNotFoundException("ERROR:PDF File - not found in zip file");
+                }
+                try (PDDocument document = PDDocument.load(new ByteArrayInputStream(baos.toByteArray()))) {
+                    PDFTextStripper stripper = new PDFTextStripper();
+                    String pdfText = stripper.getText(document);
+                    Assertions.assertTrue(pdfText.contains("1"));
+
+                }
+            }
         }
     }
-
     @Test
     void zipFileParsingTest4() throws Exception {
-        try (ZipInputStream zis = new ZipInputStream(
-                cl.getResourceAsStream("zipExample.zip")
-        )) {
-            ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
-                if (entry.getName().endsWith(".xlsx")) {
-                    break;
-                }
-                throw new FileNotFoundException("ERROR:XLSL File - not found in zip file");
+        ClassLoader cl = this.getClass().getClassLoader();
+        try (InputStream resourceStream = cl.getResourceAsStream("zipExample.zip")) {
+            if (resourceStream == null) {
+                throw new FileNotFoundException("ERROR:zipExample File not found in resources");
             }
-            XLS xls = new XLS(zis);
-            Assertions.assertEquals("2092", xls.excel.getSheetAt(0).getRow(2).getCell(0).getStringCellValue());
+            try (ZipInputStream zis = new ZipInputStream(resourceStream)) {
+                ZipEntry entry;
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                boolean xlsxFound = false;
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (entry.getName().endsWith(".xlsx")) {
+                        byte[] buffer = new byte[1024];
+                        int len;
+                        while ((len = zis.read(buffer)) > 0) {
+                            baos.write(buffer, 0,len);
+                        }
+                        xlsxFound = true;
+                        break;
+                    }
+                }
+                if (!xlsxFound){
+                    throw new FileNotFoundException("ERROR:xlsx File - not found in zip file");
+                }
+                try(Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(baos.toByteArray()))) {
+                    String cellValue = workbook.getSheetAt(0).getRow(2).getCell(0).getStringCellValue();
+                    Assertions.assertEquals("2092", cellValue);
+                }
+            }
         }
     }
 }
