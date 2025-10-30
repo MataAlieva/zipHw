@@ -35,16 +35,20 @@ public class FileParsingTest {
                 cl.getResourceAsStream("files.zip")
         )) {
             ZipEntry entry;
+            boolean csv = false;
             while ((entry = zis.getNextEntry()) != null) {
                 if (entry.getName().endsWith(".csv")) {
+                    csv = true;
+                    try (Reader reader = new InputStreamReader(zis);
+                         CSVReader csvReader = new CSVReader(reader)) {
+                        List<String[]> list = csvReader.readAll();
+                        Assertions.assertEquals("name", list.get(0)[0]);
+                    }
                     break;
                 }
-                throw new FileNotFoundException("ERROR:CSV File - not found in zip file");
             }
-            try (Reader reader = new InputStreamReader(zis); CSVReader csvReader = new CSVReader(reader)) {
-                List<String[]> list = csvReader.readAll();
-                Assertions.assertEquals("name", list.get(0)[0]);
-
+            if (!csv) {
+                throw new FileNotFoundException("ERROR:CSV File - not found in zip file");
             }
         }
     }
